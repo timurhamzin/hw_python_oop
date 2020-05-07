@@ -14,12 +14,8 @@ class Calculator:
     def add_record(self, record):
         self.records.append(record)
 
-    def _get_stats(self, min_datetime, max_datetime):
-        periods_amount = 0
-        for record in self.records:
-            if min_datetime <= record.date <= max_datetime:
-                periods_amount += record.amount
-        return periods_amount
+    def _get_stats(self, start_date, end_date):
+        return sum([record.amount for record in self.records if start_date <= record.date <= end_date])
 
     def get_today_stats(self):
         return self._get_stats(today(), today())
@@ -33,14 +29,17 @@ class Calculator:
 
 class Record:
 
-    def __init__(self, amount: float, comment: str, date=dt.datetime.now()):
+    DATE_FORMAT = '%d.%m.%Y'
+
+    def __init__(self, amount: float, comment: str, date=None):
+        if not date:
+            date = dt.datetime.now()
         self.amount = amount
         if isinstance(date, str):
-            date_format = '%d.%m.%Y'
             try:
-                date = dt.datetime.strptime(date, date_format).date()
+                date = dt.datetime.strptime(date, self.DATE_FORMAT).date()
             except ValueError:
-                raise ValueError(f'Wrong date format. Expected {date_format}. Provided: {date}.')
+                raise ValueError(f'Wrong date format. Expected {self.DATE_FORMAT}. Provided: {date}.')
         elif isinstance(date, dt.datetime):
             date = date.date()
         self.date = date
@@ -51,31 +50,27 @@ class CashCalculator(Calculator):
     USD_RATE = 60.
     EURO_RATE = 70.
 
-    currency_dict = {
-        'usd': 'USD',
-        'eur': 'Euro',
-        'rub': 'руб'
-    }
+    CURRENCIES = {
+            'usd': (USD_RATE, 'USD'),
+            'eur': (EURO_RATE, 'Euro'),
+            'rub': (1, 'руб')
+        }
 
     def conversion_rate(self, to_currency: str):
-        rate = 1
-        if to_currency == 'usd':
-            rate = self.USD_RATE
-        elif to_currency == 'eur':
-            rate = self.EURO_RATE
-        elif to_currency != 'rub':
-            raise ValueError(f'Unexpected currency name: {to_currency}')
-        return rate
+        return self.CURRENCIES[to_currency][0]
 
     def get_today_cash_remained(self, currency):
         remained_default_currency = super().get_today_remained()
         remained = remained_default_currency / self.conversion_rate(currency)
-        if remained > 0:
-            res = f'На сегодня осталось {round(remained, 2)} {self.currency_dict[currency]}'
-        elif remained == 0:
+        currency_display_name = self.CURRENCIES[currency][1]
+        if remained == 0:
             res = 'Денег нет, держись'
+        elif remained > 0:
+            remained_rounded = round(remained, 2)
+            res = f'На сегодня осталось {remained_rounded} {currency_display_name}'
         else:
-            res = f'Денег нет, держись: твой долг - {abs(round(remained, 2))} {self.currency_dict[currency]}'
+            debt = abs(round(remained, 2))
+            res = f'Денег нет, держись: твой долг - {debt} {currency_display_name}'
         return res
 
 
